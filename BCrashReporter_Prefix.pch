@@ -1,0 +1,7 @@
+//
+// Prefix header for all source files of the 'BCrashReporter' target in the 'BCrashReporter' project.
+//
+
+#ifdef __OBJC__
+    #import <Cocoa/Cocoa.h>
+#endif
