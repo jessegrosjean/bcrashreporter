@@ -28,8 +28,6 @@
 
 #pragma mark accessors
 
-- (NSString *)crashPath;
-- (NSString *)exceptionPath;
 - (void)setStatusMessage:(NSString *)message;
 
 #pragma mark actions

@@ -39,14 +39,6 @@
 
 #pragma mark accessors
 
-- (NSString *)crashPath {
-    return [[NSString stringWithFormat:@"~/Library/Logs/CrashReporter/%@.crash.log", [[NSProcessInfo processInfo] processName]] stringByExpandingTildeInPath];
-}
-
-- (NSString *)exceptionPath {
-    return [[NSString stringWithFormat:@"~/Library/Logs/CrashReporter/%@.exception.log", [[NSProcessInfo processInfo] processName]] stringByExpandingTildeInPath];
-}
-
 - (void)setStatusMessage:(NSString *)message {
     if ([message length]) {
 		[statusProgressIndicator startAnimation:nil];
@@ -62,13 +54,19 @@
 
 - (IBAction)check:(id)sender {
 	NSFileManager *fileManager = [NSFileManager defaultManager];
-	NSString *crashPath = [self crashPath];
-	NSString *exceptionPath = [self exceptionPath];
+	NSString *processName = [[NSProcessInfo processInfo] processName];
+	NSMutableArray *crashLogs = [NSMutableArray array];
 	
-	if ([fileManager fileExistsAtPath:crashPath] || [fileManager fileExistsAtPath:exceptionPath]) {
+	for (NSString *each in [[NSFileManager defaultManager] enumeratorAtPath:[@"~/Library/Logs/CrashReporter/" stringByExpandingTildeInPath]]) {
+		if ([each hasPrefix:processName]) {
+			[crashLogs addObject:[[NSString stringWithFormat:@"~/Library/Logs/CrashReporter/%@", each] stringByExpandingTildeInPath]];
+		}
+	}
+		
+	if ([crashLogs count] > 0) {
 		NSWindow *window = [self window];
 		NSString *processName = [[NSProcessInfo processInfo] processName];
-		NSMutableString *crashLogs = [NSMutableString string];
+		NSMutableString *crashLogsContent = [NSMutableString string];
 		
 		[statusProgressIndicator setUsesThreadedAnimation:YES];
 		
@@ -77,24 +75,22 @@
 		
 		[window center];
 		[window orderFront:self];
-		
-		if ([fileManager fileExistsAtPath:crashPath]) {
-			NSString *crashLog = [NSString stringWithContentsOfFile:crashPath];
-			if ([crashLog length] > 0) {
-				[crashLogs appendString:crashLog];
+
+		for (NSString *each in crashLogs) {
+			if ([fileManager fileExistsAtPath:each]) {
+				NSString *crashLog = [NSString stringWithContentsOfFile:each];
+				if ([crashLog length] > 0) {
+					[crashLogsContent appendString:crashLog];
+				}
+				[fileManager removeFileAtPath:each handler:nil];
 			}
-			[fileManager removeFileAtPath:crashPath handler:nil];
 		}
 		
-		if ([fileManager fileExistsAtPath:[self exceptionPath]]) {
-			NSString *exceptionLog = [NSString stringWithContentsOfFile:exceptionPath];
-			if ([exceptionLog length] > 0) {
-				[crashLogs appendString:exceptionLog];
-			}
-			[fileManager removeFileAtPath:exceptionPath handler:nil];
+		if ([crashLogsContent length] > 5000) {
+			crashLogsContent = (id) [crashLogsContent substringToIndex:5000];
 		}
 		
-		[crashReport setObject:crashLogs forKey:@"log"];
+		[crashReport setObject:crashLogsContent forKey:@"log"];
 	}
 }
 
@@ -129,10 +125,11 @@
 		[reportString appendFormat:@"%@=%@", key, [[crashReport objectForKey:key] stringByAddingPercentEscapesUsingEncoding:NSUTF8StringEncoding]];
 	}
     
-    NSData *data = nil;
+	BOOL tryingToSendReport = YES;
 	
-    while(!data || [data length] == 0) {
-		NSError *error;
+    while (tryingToSendReport) {		
+		NSData *data = nil;
+		NSError *error = nil;
 		NSURLResponse *reply;
 		NSURL *crashReportURL = [NSURL URLWithString:crashReportURLString];
 		NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:crashReportURL cachePolicy:NSURLRequestReloadIgnoringCacheData timeoutInterval:120];
@@ -146,20 +143,18 @@
 		
 		[self setStatusMessage:@""];
 		
-		if (!data || [data length] == 0) {
-			if (NSRunAlertPanel(BLocalizedString(@"Unable to send crash report", nil),
-								[error localizedDescription],
-								BLocalizedString(@"Try Again", nil), 
-								BLocalizedString(@"Cancel", nil),
-								nil) == NSAlertAlternateReturn) {
-				break;
-			}
+		if (error) {
+			tryingToSendReport = NSRunAlertPanel(BLocalizedString(@"Unable to send crash report", nil),
+												 [error localizedDescription],
+												 BLocalizedString(@"Try Again", nil), 
+												 BLocalizedString(@"Cancel", nil), nil) == NSAlertAlternateReturn;
 		} else {
 			NSRunAlertPanel(BLocalizedString(@"Thank You", nil),
 							BLocalizedString(@"The crash report has been sent.", nil),
 							BLocalizedString(@"OK", nil), 
 							nil,
 							nil);
+			tryingToSendReport = NO;
 		}
     }
 	
@@ -177,3 +172,31 @@
 }
 
 @end
+
+
+/*
+ 
+ Can't get this darn NSExceptionHandler to work!
+ + (void)initialize {
+ NSUInteger mask = [[NSExceptionHandler defaultExceptionHandler] exceptionHandlingMask];
+ mask = NSLogUncaughtExceptionMask | NSLogUncaughtSystemExceptionMask | NSLogUncaughtRuntimeErrorMask | NSLogTopLevelExceptionMask | NSLogOtherExceptionMask | NSHandleUncaughtExceptionMask | NSHandleUncaughtSystemExceptionMask | NSHandleUncaughtRuntimeErrorMask | NSHandleTopLevelExceptionMask | NSHandleOtherExceptionMask;
+ [[NSExceptionHandler defaultExceptionHandler] setExceptionHangingMask:mask];
+ [[NSExceptionHandler defaultExceptionHandler] setDelegate:[self sharedInstance]];
+ }
+ 
+ + (id)sharedInstance {
+ static id sharedInstance = nil;
+ if (sharedInstance == nil) {
+ sharedInstance = [self alloc];
+ sharedInstance = [sharedInstance init];
+ }
+ return sharedInstance;
+ }
+ 
+ - (BOOL)exceptionHandler:(NSExceptionHandler *)sender shouldHandleException:(NSException *)exception mask:(unsigned int)aMask {
+ return YES;
+ }
+ - (BOOL)exceptionHandler:(NSExceptionHandler *)sender shouldLogException:(NSException *)exception mask:(unsigned int)aMask {
+ return YES;
+ }
+ */
