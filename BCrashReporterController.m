@@ -63,7 +63,7 @@
 		}
 	}
 		
-	if ([crashLogs count] > 0) {
+	if ([crashLogs count] == 0) {
 		NSWindow *window = [self window];
 		NSString *processName = [[NSProcessInfo processInfo] processName];
 		NSMutableString *crashLogsContent = [NSMutableString string];
@@ -86,8 +86,12 @@
 			}
 		}
 		
-		if ([crashLogsContent length] > 5000) {
-			crashLogsContent = (id) [crashLogsContent substringToIndex:5000];
+		NSString *consoleLog = [BLog gatherConsoleLogFromDate:[[NSCalendarDate calendarDate] dateByAddingYears:0 months:0 days:0 hours:(-1) minutes:0 seconds:0]];
+		
+		[crashLogsContent insertString:[NSString stringWithFormat:@"%@\n\n", consoleLog] atIndex:0];
+		
+		if ([crashLogsContent length] > 256*1024) {
+			crashLogsContent = (id) [crashLogsContent substringToIndex:256*1024];
 		}
 		
 		[crashReport setObject:crashLogsContent forKey:@"log"];
