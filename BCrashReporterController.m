@@ -63,7 +63,7 @@
 		}
 	}
 		
-	if ([crashLogs count] == 0) {
+	if ([crashLogs count] > 0) {
 		NSWindow *window = [self window];
 		NSString *processName = [[NSProcessInfo processInfo] processName];
 		NSMutableString *crashLogsContent = [NSMutableString string];
